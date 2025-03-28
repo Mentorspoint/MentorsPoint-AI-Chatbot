@@ -1,33 +1,66 @@
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
-require("dotenv").config();
+document.addEventListener("DOMContentLoaded", function () {
+  const chatbotContainer = document.getElementById("chatbot-container");
+  const chatbotIcon = document.getElementById("chatbot-icon");
+  const closeButton = document.getElementById("close-btn");
+  const sendBtn = document.getElementById("send-btn");
+  const chatbotInput = document.getElementById("chatbot-input");
+  const chatbotMessages = document.getElementById("chatbot-messages");
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+  // Toggle chatbot visibility
+  chatbotIcon.addEventListener("click", function () {
+    chatbotContainer.classList.remove("hidden");
+    chatbotIcon.style.display = "none";
+  });
 
-const HF_API_URL = "https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill";
-const HF_API_KEY = process.env.HF_API_KEY; // Ensure this is set in .env
+  closeButton.addEventListener("click", function () {
+    chatbotContainer.classList.add("hidden");
+    chatbotIcon.style.display = "flex";
+  });
 
-app.post("/chatbot", async (req, res) => {
+  sendBtn.addEventListener("click", sendMessage);
+  chatbotInput.addEventListener("keypress", function (e) {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
+  });
+
+  function sendMessage() {
+    const userMessage = chatbotInput.value.trim();
+    if (userMessage) {
+      appendMessage("user", userMessage);
+      chatbotInput.value = "";
+      getChatbotResponse(userMessage);
+    }
+  }
+
+  function appendMessage(sender, message) {
+    const messageElement = document.createElement("div");
+    messageElement.classList.add("message", sender);
+    messageElement.textContent = message;
+    chatbotMessages.appendChild(messageElement);
+    chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+  }
+
+  async function getChatbotResponse(message) {
     try {
-        const userMessage = req.body.message;
-        if (!userMessage) {
-            return res.status(400).json({ error: "Message is required" });
+        const response = await fetch("https://mentorspoint-chatbot.onrender.com/chatbot", { // Replace with your actual Render URL
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
         }
 
-        const response = await axios.post(
-            HF_API_URL,
-            { inputs: userMessage },
-            { headers: { Authorization: `Bearer ${HF_API_KEY}` } }
-        );
+        const data = await response.json();
+        const botMessage = data[0]?.generated_text || "Sorry, I didn't understand that.";
 
-        res.json(response.data);
+        appendMessage("bot", botMessage);
     } catch (error) {
-        console.error("Backend Error:", error.response?.data || error.message);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("Error fetching bot response:", error);
+        appendMessage("bot", "Sorry, something went wrong. Please try again.");
     }
-});
+}
 
-app.listen(3000, () => console.log("🚀 Server running on port 3000"));
+});
